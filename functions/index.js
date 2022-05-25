@@ -1,22 +1,24 @@
 const functions = require("firebase-functions");
+const axios = require("axios");
 
 // The Firebase Admin SDK to access Firestore.
 const admin = require("firebase-admin");
 admin.initializeApp();
 
+const algoveraApiKey = "adecc845-d854-4f19-a278-3e0915139a18";
+
 exports.createEmbedding = functions.firestore
   .document("/algovera/{documentId}")
-  .onCreate((snap, context) => {
-    // Grab the current value of what was written to Firestore.
-    const original = snap.data().original;
+  .onCreate(async (snap, context) => {
+    const text = snap.data().text;
 
-    // Access the parameter `{documentId}` with `context.params`
-    functions.logger.log("Uppercasing", context.params.documentId, original);
-
-    const uppercase = original.toUpperCase();
-
-    // You must return a Promise when performing asynchronous tasks inside a Functions such as
-    // writing to Firestore.
-    // Setting an 'uppercase' field in Firestore document returns a Promise.
-    return snap.ref.set({ uppercase }, { merge: true });
+    return axios.post(
+      "https://replabs-flask-app-aucndxjanq-ew.a.run.app/create_embedding",
+      {
+        api_key: algoveraApiKey,
+        server: "algovera",
+        id: snap.id,
+        text: text,
+      }
+    );
   });
