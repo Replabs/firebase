@@ -7,7 +7,7 @@ admin.initializeApp();
 
 const algoveraApiKey = "adecc845-d854-4f19-a278-3e0915139a18";
 
-exports.createEmbedding = functions.firestore
+module.exports = functions.firestore
   .document("/algovera/{documentId}")
   .onCreate(async (snap, context) => {
     const text = snap.data().text;
