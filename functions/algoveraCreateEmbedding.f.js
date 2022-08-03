@@ -2,8 +2,7 @@ const functions = require("firebase-functions");
 const axios = require("axios");
 
 // The Firebase Admin SDK to access Firestore.
-const admin = require("firebase-admin");
-admin.initializeApp();
+const admin = require("./admin");
 
 const algoveraApiKey = "adecc845-d854-4f19-a278-3e0915139a18";
 
