@@ -1,6 +1,9 @@
-/**
- * Every 15 minutes, fetch users that haven't been updated since a day ago.
- * For every user, fetch their latest mention tweets recursively, until they are older since last time the function was run.
+/* Every 60 minutes, fetch users that haven't been updated since a day ago.
+ *
+ * For every user:
+ *  - Fetch their latest mention tweets recursively (only tweets from after last invocation).
+ *  - Add the tweets to firestore
+ *  - Mark the user as having been scraped in firestore.
  */
 
 const functions = require("firebase-functions");
