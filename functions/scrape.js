@@ -6,7 +6,6 @@
  *  - Mark the user as having been scraped in firestore.
  */
 
-const { ListMembershipsV1Paginator } = require("twitter-api-v2");
 const admin = require("./admin");
 const TwitterApi = require("twitter-api-v2").TwitterApi;
 
@@ -232,11 +231,8 @@ async function getReplyTweetsRecursively(
     return tweet;
   });
 
-  // Filter out tweets which couldn't be matched with a referenced tweet.
-  // This can happen if the referenced tweet was deleted.
-  accumulatedTweets = accumulatedTweets.concat(
-    tweets.filter((t) => t.referenced_tweet)
-  );
+  // Add the tweets to the total accumulated tweets.
+  accumulatedTweets = accumulatedTweets.concat(tweets);
 
   if (
     response.meta &&
