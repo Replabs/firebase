@@ -31,15 +31,18 @@ module.exports = async () => {
   const metadata_ref = admin
     .firestore()
     .collection("crawls")
-    .doc(metadata.started_at.toDate().toISOString());
+    .doc(metadata.start_time.toDate().toISOString());
 
   // The lists.
   const lists = await admin.firestore().collection("lists").get();
 
   // The lists that still haven't been crawled.
-  const uncrawledLists = lists.docs.filter(
+  const uncrawledLists = [[...lists.docs][0]].filter(
+    // TODO! only first list for now.
     (l) => !metadata.crawled_lists.includes(l.id)
   );
+
+  console.log(`uncrawled lists: ${uncrawledLists.length}`);
 
   //
   // For each uncrawled lists, crawl all the uncrawled users.
@@ -47,24 +50,24 @@ module.exports = async () => {
   //
   for (const list of uncrawledLists) {
     // The users that still haven't been crawled.
-    const uncrawledUsers = list.members.filter(
-      (m) => !metadata.crawled_users.includes(m.id)
-    );
+    const uncrawledUsers = list.data()["members"].filter((m) => {
+      return !metadata.crawled_users.includes(m.id);
+    });
 
     // Loop through the uncrawled users.
     for (const user of uncrawledUsers) {
       // Crawl the user.
-      await crawlUser(user.id, client, metadata.started_at.toDate());
+      await crawlUser(user.id, client, metadata.start_time.toDate());
 
       // Mark the user as having been crawled asynchronously.
       metadata_ref.update({
-        crawled_users: arrayUnion(user.id),
+        crawled_users: admin.firestore.FieldValue.arrayUnion(user.id),
       });
     }
 
     // Mark the list as having been crawled asynchronously.
     metadata_ref.update({
-      lists: arrayUnion(list.id),
+      crawled_lists: admin.firestore.FieldValue.arrayUnion(list.id),
     });
   }
 
@@ -87,15 +90,26 @@ async function getMetadata() {
   const latest = await admin
     .firestore()
     .collection("crawls")
-    .where("completed_at", "!=", null)
+    .orderBy("start_time", "desc")
     .limit(1)
     .get();
 
   // If no uncompleted crawl exists, create one.
-  if (latest.empty) {
+  if (latest.empty || latest.docs[0].data()["completed_at"] != null) {
+    // Set the default start time to two weeks ago.
+    let startTimestamp = admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() - 1000 * 60 * 60 * 24 * 14)
+    );
+
+    // If a previous completed crawl exists, use the end time
+    // of that crawl as starting time instead.
+    if (!latest.empty) {
+      startTimestamp = latest.docs[0].data()["completed_at"];
+    }
+
     // The metadata.
     const data = {
-      started_at: admin.firestore.Timestamp.fromDate(new Date()),
+      start_time: startTimestamp,
       completed_at: null,
       crawled_users: [],
       crawled_lists: [],
@@ -105,7 +119,7 @@ async function getMetadata() {
     await admin
       .firestore()
       .collection("crawls")
-      .doc(data.started_at.toDate().toISOString())
+      .doc(data.start_time.toDate().toISOString())
       .set(data);
 
     // Return the metadata.
@@ -200,7 +214,7 @@ async function getReplyTweetsRecursively(
     return accumulatedTweets;
   }
 
-  tweets = tweets.map((tweet) => {
+  tweets = response.data.map((tweet) => {
     // Attach the full referenced tweet object to each tweet, if applicable.
     if (tweet.referenced_tweets?.length > 0) {
       // The referenced tweet's ID.
