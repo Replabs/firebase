@@ -3,7 +3,7 @@
  */
 
 const functions = require("firebase-functions");
-const admin = require("./admin");
+const admin = require("../admin");
 const TwitterApi = require("twitter-api-v2").TwitterApi;
 
 module.exports = functions.firestore
@@ -17,23 +17,28 @@ module.exports = functions.firestore
       accessSecret: process.env.ACCESS_TOKEN_SECRET,
     });
 
-    // The twitter ID of the user.
-    const twitterId = snap.id;
-
     // Get the user's lists.
-    const lists = await client.lists.listUserOwnedLists(twitterId);
+    const lists = await client.v2.get(`users/${snap.id}/owned_lists`);
+
+    // Create a firestore batch.
+    const batch = admin.firestore().batch();
 
     for (const list of lists.data) {
       // Get the list members.
-      const members = await client.v2.get(`/2/lists/${list.id}/members`);
+      const response = await client.v2.get(`lists/${list.id}/members`);
 
-      // Upsert the list in firestore.
-      await admin.firestore().collection("lists").doc(list.id).set(
+      // Add the list to the firestore batch, updating the list if it already exists.
+      batch.set(
+        admin.firestore().collection("lists").doc(list.id),
         {
           id: list.id,
-          members: members,
+          name: list.name,
+          members: response.data ?? [],
         },
         { merge: true }
       );
     }
+
+    // Commit the batch.
+    await batch.commit();
   });

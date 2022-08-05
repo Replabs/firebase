@@ -6,37 +6,40 @@
  *  - Mark the user as having been scraped in firestore.
  */
 
+const { ListMembershipsV1Paginator } = require("twitter-api-v2");
 const admin = require("./admin");
-const arrayUnion = admin.firestore.FieldValue.arrayUnion;
-const Timestamp = admin.firestore.FieldValue.Timestamp;
 const TwitterApi = require("twitter-api-v2").TwitterApi;
 
-module.exports = function scrape() {
- // The time when the function starts.
- const start = Date.now();
+module.exports = async () => {
+  // The time when the function starts.
+  const start = Date.now();
 
- // The twitter client.
- const client = new TwitterApi({
-   appKey: process.env.CONSUMER_KEY,
-   appSecret: process.env.CONSUMER_SECRET,
-   accessToken: process.env.ACCESS_TOKEN_KEY,
-   accessSecret: process.env.ACCESS_TOKEN_SECRET,
- });
+  // The twitter client.
+  const client = new TwitterApi({
+    appKey: process.env.CONSUMER_KEY,
+    appSecret: process.env.CONSUMER_SECRET,
+    accessToken: process.env.ACCESS_TOKEN_KEY,
+    accessSecret: process.env.ACCESS_TOKEN_SECRET,
+  });
 
- // Fetch the metadata about the crawl.
- const metadata = await getMetadata();
+  // Fetch the metadata about the crawl.
+  const metadata = await getMetadata();
 
- // The ref of the metadata document (ID is the ISO string of the start time of the crawl).
- const metadata_ref = admin.firestore().collection('crawls').doc(metadata.start_time.toDate().toISOString())
+  console.log(metadata);
 
- // The lists.
- const lists = await admin
-   .firestore()
-   .collection("lists")
-   .get();
+  // The ref of the metadata document (ID is the ISO string of the start time of the crawl).
+  const metadata_ref = admin
+    .firestore()
+    .collection("crawls")
+    .doc(metadata.started_at.toDate().toISOString());
 
-   // The lists that still haven't been crawled.
-  const uncrawledLists = lists.docs.filter(l => !metadata.crawled_lists.includes(l.id));
+  // The lists.
+  const lists = await admin.firestore().collection("lists").get();
+
+  // The lists that still haven't been crawled.
+  const uncrawledLists = lists.docs.filter(
+    (l) => !metadata.crawled_lists.includes(l.id)
+  );
 
   //
   // For each uncrawled lists, crawl all the uncrawled users.
@@ -44,12 +47,14 @@ module.exports = function scrape() {
   //
   for (const list of uncrawledLists) {
     // The users that still haven't been crawled.
-    const uncrawledUsers = list.members.filter(m => !metadata.crawled_users.includes(m.id))
+    const uncrawledUsers = list.members.filter(
+      (m) => !metadata.crawled_users.includes(m.id)
+    );
 
     // Loop through the uncrawled users.
     for (const user of uncrawledUsers) {
       // Crawl the user.
-      await crawlUser(user.id, client, lastCrawledAt);
+      await crawlUser(user.id, client, metadata.started_at.toDate());
 
       // Mark the user as having been crawled asynchronously.
       metadata_ref.update({
@@ -63,15 +68,15 @@ module.exports = function scrape() {
     });
   }
 
- // Mark the crawl as complete.
- metadata_ref.update({
-  completed_at: Timestamp.fromDate(new Date()),  
-});
+  // Mark the crawl as complete.
+  metadata_ref.update({
+    completed_at: admin.firestore.Timestamp.fromDate(new Date()),
+  });
 
- console.log(
-   `Finished crawling. Took ${(Date.now() - start) / 1000} seconds.`
- );
-}
+  console.log(
+    `Finished crawling. Took ${(Date.now() - start) / 1000} seconds.`
+  );
+};
 
 /**
  * Get the crawl metadata, with information such as which users and lists have been crawled,
@@ -82,46 +87,42 @@ async function getMetadata() {
   const latest = await admin
     .firestore()
     .collection("crawls")
-    .orderBy('started_at')
-    .where('completed_at', '!=', null)
+    .where("completed_at", "!=", null)
     .limit(1)
     .get();
 
   // If no uncompleted crawl exists, create one.
   if (latest.empty) {
-    const now = new Date()
-
     // The metadata.
     const data = {
-      started_at: Timestamp.fromDate(now),
+      started_at: admin.firestore.Timestamp.fromDate(new Date()),
       completed_at: null,
       crawled_users: [],
       crawled_lists: [],
     };
 
     // Update the metadata in firestore.
-    await admin.firestore().collection("crawls").doc(now.toISOString()).set({
-      started_at: Timestamp.fromDate(new Date()),
-      completed_at: null,
-      crawled_users: [],
-      crawled_lists: [],
-    });
+    await admin
+      .firestore()
+      .collection("crawls")
+      .doc(data.started_at.toDate().toISOString())
+      .set(data);
 
     // Return the metadata.
     return data;
   } else {
     // Return the latest uncompleted crawl's metadata.
-    return {...latest.docs[0].data()};
+    return { ...latest.docs[0].data() };
   }
 }
 
 /**
  * Crawl recent tweets for a user and adds them to firestore.
  */
-async function crawlUser(userId, client) {
+async function crawlUser(userId, client, lastCrawledAt) {
   console.log(`Crawling user ${userId}`);
   // Get the tweets for the user.
-  const tweets = await getReplyTweetsRecursively(userId, client, lastCrawl);
+  const tweets = await getReplyTweetsRecursively(userId, client, lastCrawledAt);
 
   //
   // Add the tweets to firestore.
@@ -145,7 +146,7 @@ async function crawlUser(userId, client) {
       id: tweets[i].id,
       author_id: tweets[i].author_id,
       text: tweets[i].text,
-      created_at: Timestamp.fromDate(new Date()),
+      created_at: admin.firestore.Timestamp.fromDate(new Date()),
       referenced_tweet: tweets[i].referenced_tweet
         ? {
             id: tweets[i].referenced_tweet.id,
@@ -179,8 +180,6 @@ async function getReplyTweetsRecursively(
   accumulatedTweets = [],
   paginationLimit = 100
 ) {
-  console.log(lastCrawledAt?.toISOString());
-
   let params = {
     max_results: 100,
     start_time: lastCrawledAt?.toISOString(),
@@ -204,7 +203,10 @@ async function getReplyTweetsRecursively(
   tweets = tweets.map((tweet) => {
     // Attach the full referenced tweet object to each tweet, if applicable.
     if (tweet.referenced_tweets?.length > 0) {
+      // The referenced tweet's ID.
       const referencedTweetId = tweet.referenced_tweets[0].id;
+
+      // The data of the referenced tweet.
       const referencedTweet = response.includes.tweets?.find(
         (t) => t.id == referencedTweetId
       );
