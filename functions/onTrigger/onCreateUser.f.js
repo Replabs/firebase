@@ -33,6 +33,7 @@ module.exports = functions.firestore
         {
           id: list.id,
           name: list.name,
+          owner_id: snap.id,
           members: response.data ?? [],
         },
         { merge: true }

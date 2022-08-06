@@ -1,9 +1,8 @@
-/* Fetch users that haven't been updated since a day ago.
+/**
+ * Scrape tweets on a list basis.
  *
- * For every user:
- *  - Fetch their latest tweets recursively (only tweets from after last invocation).
- *  - Add the tweets to firestore
- *  - Mark the user as having been scraped in firestore.
+ * Fetch tweets since last scrape was finished.
+ * Add all tweets to firestore.
  */
 
 const admin = require("./admin");
@@ -154,17 +153,21 @@ async function crawlUser(userId, client, lastCrawledAt) {
       batch = admin.firestore().batch();
     }
 
+    //
     // Map the twitter data to the firestore object.
+    //
     const data = {
       id: tweets[i].id,
       author_id: tweets[i].author_id,
       text: tweets[i].text,
       created_at: admin.firestore.Timestamp.fromDate(new Date()),
+      embedding: null,
       referenced_tweet: tweets[i].referenced_tweet
         ? {
             id: tweets[i].referenced_tweet.id,
             author_id: tweets[i].referenced_tweet.author_id,
             text: tweets[i].referenced_tweet.text,
+            embedding: null,
           }
         : null,
     };
@@ -229,6 +232,15 @@ async function getReplyTweetsRecursively(
     }
 
     return tweet;
+  });
+
+  // Filter out tweets where the referenced tweet's author is themself.
+  tweets = tweets.filter((t) => {
+    if (t.referenced_tweet) {
+      return t.referenced_tweet.author_id != t.author_id;
+    }
+
+    return true;
   });
 
   // Add the tweets to the total accumulated tweets.
