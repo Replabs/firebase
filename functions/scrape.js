@@ -23,8 +23,6 @@ module.exports = async () => {
   // Fetch the metadata about the crawl.
   const metadata = await getMetadata();
 
-  console.log(metadata);
-
   // The ref of the metadata document (ID is the ISO string of the start time of the crawl).
   const metadata_ref = admin
     .firestore()
@@ -94,9 +92,9 @@ async function getMetadata() {
 
   // If no uncompleted crawl exists, create one.
   if (latest.empty || latest.docs[0].data()["completed_at"] != null) {
-    // Set the default start time to two weeks ago.
+    // Set the default start time to 2016.
     let startTimestamp = admin.firestore.Timestamp.fromDate(
-      new Date(Date.now() - 1000 * 60 * 60 * 24 * 14)
+      new Date(2016, 0, 1)
     );
 
     // If a previous completed crawl exists, use the end time
@@ -159,6 +157,7 @@ async function crawlUser(userId, client, lastCrawledAt) {
     const data = {
       id: tweets[i].id,
       author_id: tweets[i].author_id,
+      recipient_id: tweets[i].referenced_tweet?.author_id,
       text: tweets[i].text,
       created_at: admin.firestore.Timestamp.fromDate(new Date()),
       embedding: null,
@@ -240,7 +239,8 @@ async function getReplyTweetsRecursively(
       return t.referenced_tweet.author_id != t.author_id;
     }
 
-    return true;
+    // Don't include tweets without a reference tweet!
+    return false;
   });
 
   // Add the tweets to the total accumulated tweets.
