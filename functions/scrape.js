@@ -50,7 +50,7 @@ module.exports = async () => {
     });
 
     // Loop through the uncrawled users.
-    for (const user of uncrawledUsers[0]) {
+    for (const user of uncrawledUsers) {
       // Crawl the user.
       await crawlUser(user.id, client, metadata.start_time.toDate());
 
