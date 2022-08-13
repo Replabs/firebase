@@ -1,5 +1,5 @@
 /**
- * Call the scraping script.
+ * Scrape all tweets since last scrape.
  */
 
 const functions = require("firebase-functions");

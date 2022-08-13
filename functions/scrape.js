@@ -160,7 +160,7 @@ async function crawlUser(userId, client, lastCrawledAt) {
       recipient_id: tweets[i].referenced_tweet?.author_id,
       text: tweets[i].text,
       created_at: admin.firestore.Timestamp.fromDate(new Date()),
-      embedding: null,
+      sentiment: null,
       referenced_tweet: tweets[i].referenced_tweet
         ? {
             id: tweets[i].referenced_tweet.id,
