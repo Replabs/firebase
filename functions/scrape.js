@@ -33,8 +33,7 @@ module.exports = async () => {
   const lists = await admin.firestore().collection("lists").get();
 
   // The lists that still haven't been crawled.
-  const uncrawledLists = [[...lists.docs][0]].filter(
-    // TODO! only first list for now.
+  const uncrawledLists = lists.docs.filter(
     (l) => !metadata.crawled_lists.includes(l.id)
   );
 
