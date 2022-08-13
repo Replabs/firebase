@@ -2,9 +2,9 @@
  * Create or update the user's lists.
  */
 
+const TwitterApi = require("twitter-api-v2").TwitterApi;
 const functions = require("firebase-functions");
 const admin = require("../admin");
-const TwitterApi = require("twitter-api-v2").TwitterApi;
 
 module.exports = functions.firestore
   .document("/users/{documentId}")

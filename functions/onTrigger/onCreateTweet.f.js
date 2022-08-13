@@ -3,6 +3,7 @@
  */
 
 const functions = require("firebase-functions");
+const admin = require("../admin");
 const axios = require("axios");
 
 // The base url for the flask app.
