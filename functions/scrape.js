@@ -91,9 +91,9 @@ async function getMetadata() {
 
   // If no uncompleted crawl exists, create one.
   if (latest.empty || latest.docs[0].data()["completed_at"] != null) {
-    // Set the default start time to 2016.
+    // Set the default start time to 2020.
     let startTimestamp = admin.firestore.Timestamp.fromDate(
-      new Date(2016, 0, 1)
+      new Date(2020, 0, 1)
     );
 
     // If a previous completed crawl exists, use the end time
