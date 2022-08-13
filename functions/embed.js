@@ -14,6 +14,10 @@ module.exports = async () => {
     .where("sentiment", "==", null)
     .get();
 
+  console.log(
+    `About to calculate embeddings and sentiments for ${tweets.docs.length} tweets.`
+  );
+
   for (const tweet of tweets.docs) {
     // Get the response from the backend server.
     const response = await axios.post(baseUrl + "/embed", {
@@ -27,5 +31,7 @@ module.exports = async () => {
       .collection("tweets")
       .doc(tweet.id)
       .update(response.data);
+
+    console.log(`Updated tweet ${tweet.id}`);
   }
 };
