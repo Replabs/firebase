@@ -1,9 +1,10 @@
 const admin = require("./admin");
+const axios = require("axios");
 
 // The base url for the flask app.
 const baseUrl = process.env.FUNCTIONS_EMULATOR
   ? "http://127.0.0.1:5000"
-  : "https://replabs-flask-app-aucndxjanq-ew.a.run.app";
+  : "https://backend-bo3523uimq-uc.a.run.app";
 
 module.exports = async () => {
   // Unembedded tweets.
@@ -24,7 +25,7 @@ module.exports = async () => {
     await admin
       .firestore()
       .collection("tweets")
-      .doc(snap.id)
+      .doc(tweet.id)
       .update(response.data);
   }
 };
