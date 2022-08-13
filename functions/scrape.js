@@ -210,7 +210,7 @@ async function getReplyTweetsRecursively(
   paginationCount = 1,
   paginationToken = null,
   accumulatedTweets = [],
-  paginationLimit = 25
+  paginationLimit = 10
 ) {
   let params = {
     max_results: 100,
