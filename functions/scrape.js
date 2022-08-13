@@ -141,10 +141,10 @@ async function crawlUser(userId, client, lastCrawledAt) {
 
   for (let i = 0; i < tweets.length; i++) {
     //
-    // There is a 500 write limit to firestore batches.
+    // There is a write limit to firestore batches.
     // If the limit is reached, commit and refresh the batch before continuing.
     //
-    if (i >= 499) {
+    if (i >= 250) {
       await batch.commit();
 
       batch = admin.firestore().batch();
