@@ -18,6 +18,8 @@ module.exports = async () => {
     `About to calculate embeddings and sentiments for ${tweets.docs.length} tweets.`
   );
 
+  let counter = 0;
+
   for (const tweet of tweets.docs) {
     // Get the response from the backend server.
     const response = await axios.post(baseUrl + "/embed", {
@@ -32,6 +34,8 @@ module.exports = async () => {
       .doc(tweet.id)
       .update(response.data);
 
-    console.log(`Updated tweet ${tweet.id}`);
+    console.log(
+      `Updated tweet ${tweet.id} (${++counter}/${tweets.docs.length})`
+    );
   }
 };
