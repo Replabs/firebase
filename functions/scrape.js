@@ -50,41 +50,26 @@ module.exports = async () => {
     });
 
     // Loop through the uncrawled users.
-    for (const user of uncrawledUsers) {
+    for (const user of uncrawledUsers[0]) {
       // Crawl the user.
       await crawlUser(user.id, client, metadata.start_time.toDate());
 
       // Mark the user as having been crawled asynchronously.
-      metadata_ref.set(
-        {
-          crawled_users: admin.firestore.FieldValue.arrayUnion(user.id),
-        },
-        {
-          merge: true,
-        }
-      );
+      metadata_ref.update({
+        crawled_users: admin.firestore.FieldValue.arrayUnion(user.id),
+      });
     }
 
     // Mark the list as having been crawled asynchronously.
-    metadata_ref.set(
-      {
-        crawled_lists: admin.firestore.FieldValue.arrayUnion(list.id),
-      },
-      {
-        merge: true,
-      }
-    );
+    metadata_ref.update({
+      crawled_lists: admin.firestore.FieldValue.arrayUnion(list.id),
+    });
   }
 
   // Mark the crawl as complete.
-  metadata_ref.set(
-    {
-      completed_at: admin.firestore.Timestamp.fromDate(new Date()),
-    },
-    {
-      merge: true,
-    }
-  );
+  metadata_ref.update({
+    completed_at: admin.firestore.Timestamp.fromDate(new Date()),
+  });
 
   console.log(
     `Finished crawling. Took ${(Date.now() - start) / 1000} seconds.`
@@ -135,6 +120,24 @@ async function getMetadata() {
     // Return the metadata.
     return data;
   } else {
+    // Update the start time to match the ID of the document.
+    if (
+      latest.docs[0].data().start_time.toDate().toISOString() !=
+      latest.docs[0].id
+    ) {
+      console.log("Invalid start time of the crawl, updating...");
+
+      await admin
+        .firestore()
+        .collection("crawls")
+        .doc(latest.docs[0].id)
+        .update({
+          start_time: admin.firestore.Timestamp.fromDate(
+            new Date(latest.docs[0].id)
+          ),
+        });
+    }
+
     // Return the latest uncompleted crawl's metadata.
     return { ...latest.docs[0].data() };
   }

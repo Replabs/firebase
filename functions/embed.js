@@ -28,14 +28,15 @@ module.exports = async () => {
     });
 
     // Update the firestore entry.
-    await admin
+    admin
       .firestore()
       .collection("tweets")
       .doc(tweet.id)
-      .update(response.data);
-
-    console.log(
-      `Updated tweet ${tweet.id} (${++counter}/${tweets.docs.length})`
-    );
+      .update(response.data)
+      .then(() => {
+        console.log(
+          `Updated tweet ${tweet.id} (${++counter}/${tweets.docs.length})`
+        );
+      });
   }
 };
