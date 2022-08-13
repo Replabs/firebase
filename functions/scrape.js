@@ -55,21 +55,36 @@ module.exports = async () => {
       await crawlUser(user.id, client, metadata.start_time.toDate());
 
       // Mark the user as having been crawled asynchronously.
-      metadata_ref.update({
-        crawled_users: admin.firestore.FieldValue.arrayUnion(user.id),
-      });
+      metadata_ref.set(
+        {
+          crawled_users: admin.firestore.FieldValue.arrayUnion(user.id),
+        },
+        {
+          merge: true,
+        }
+      );
     }
 
     // Mark the list as having been crawled asynchronously.
-    metadata_ref.update({
-      crawled_lists: admin.firestore.FieldValue.arrayUnion(list.id),
-    });
+    metadata_ref.set(
+      {
+        crawled_lists: admin.firestore.FieldValue.arrayUnion(list.id),
+      },
+      {
+        merge: true,
+      }
+    );
   }
 
   // Mark the crawl as complete.
-  metadata_ref.update({
-    completed_at: admin.firestore.Timestamp.fromDate(new Date()),
-  });
+  metadata_ref.set(
+    {
+      completed_at: admin.firestore.Timestamp.fromDate(new Date()),
+    },
+    {
+      merge: true,
+    }
+  );
 
   console.log(
     `Finished crawling. Took ${(Date.now() - start) / 1000} seconds.`
