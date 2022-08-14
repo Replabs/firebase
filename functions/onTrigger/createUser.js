@@ -25,7 +25,9 @@ module.exports = functions.firestore
 
     for (const list of lists.data) {
       // Get the list members.
-      const response = await client.v2.get(`lists/${list.id}/members`);
+      const response = await client.v2.get(
+        `lists/${list.id}/members?user.fields=profile_image_url`
+      );
 
       // Add the list to the firestore batch, updating the list if it already exists.
       batch.set(
