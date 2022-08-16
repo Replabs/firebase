@@ -5,7 +5,12 @@
 const TwitterApi = require("twitter-api-v2").TwitterApi;
 const functions = require("firebase-functions");
 
-module.exports = functions.https.onRequest(async (snap, _) => {
+module.exports = functions.https.onRequest(async (data, _) => {
+  // Verify the API key.
+  if (!data.api_key || data.api_key != process.env.TWITTER_FLASK_API_KEY) {
+    return;
+  }
+
   // The twitter client.
   const client = new TwitterApi({
     appKey: process.env.CONSUMER_KEY,
@@ -15,5 +20,6 @@ module.exports = functions.https.onRequest(async (snap, _) => {
   });
 
   // Get the user's lists.
-  return await client.v2.get(`users/${snap.id}/owned_lists`);
+  const lists = await client.v2.get(`users/${data.id}/owned_lists`);
+  return lists;
 });
