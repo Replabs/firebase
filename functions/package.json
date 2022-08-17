@@ -24,7 +24,8 @@
     "twitter-api-v2": "^1.12.3"
   },
   "devDependencies": {
-    "eslint": "^7.27.0",
+    "eslint": "^8.22.0",
+    "eslint-config-google": "^0.14.0",
     "eslint-plugin-promise": "^5.1.0",
     "firebase-functions-test": "^0.1.6"
   },

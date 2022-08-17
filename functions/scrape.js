@@ -8,6 +8,11 @@
 const admin = require("./admin");
 const TwitterApi = require("twitter-api-v2").TwitterApi;
 
+// From whence tweets should be crawled.
+const genesisTimestamp = admin.firestore.Timestamp.fromDate(
+  new Date(2020, 0, 1)
+);
+
 module.exports = async () => {
   // The time when the function starts.
   const start = Date.now();
@@ -21,10 +26,10 @@ module.exports = async () => {
   });
 
   // Fetch the metadata about the crawl.
-  const metadata = await getMetadata();
+  const { metadata, previousMetadata } = await getMetadata();
 
   // The ref of the metadata document (ID is the ISO string of the start time of the crawl).
-  const metadata_ref = admin
+  const metadataRef = admin
     .firestore()
     .collection("crawls")
     .doc(metadata.start_time.toDate().toISOString());
@@ -44,30 +49,11 @@ module.exports = async () => {
   // After finishing crawling a user or a list, update the metadata in firestore.
   //
   for (const list of uncrawledLists) {
-    // The users that still haven't been crawled.
-    const uncrawledUsers = list.data()["members"].filter((m) => {
-      return !metadata.crawled_users.includes(m.id);
-    });
-
-    // Loop through the uncrawled users.
-    for (const user of uncrawledUsers) {
-      // Crawl the user.
-      await crawlUser(user.id, client, metadata.start_time.toDate());
-
-      // Mark the user as having been crawled asynchronously.
-      metadata_ref.update({
-        crawled_users: admin.firestore.FieldValue.arrayUnion(user.id),
-      });
-    }
-
-    // Mark the list as having been crawled asynchronously.
-    metadata_ref.update({
-      crawled_lists: admin.firestore.FieldValue.arrayUnion(list.id),
-    });
+    await crawlList(list, metadata, previousMetadata, metadataRef, client);
   }
 
   // Mark the crawl as complete.
-  metadata_ref.update({
+  metadataRef.update({
     completed_at: admin.firestore.Timestamp.fromDate(new Date()),
   });
 
@@ -75,6 +61,75 @@ module.exports = async () => {
     `Finished crawling. Took ${(Date.now() - start) / 1000} seconds.`
   );
 };
+
+/**
+ * Crawls users in a list in batches.
+ */
+async function crawlList(
+  list,
+  metadata,
+  previousMetadata,
+  metadataRef,
+  client,
+  batchSize = 10
+) {
+  // The users that still haven't been crawled.
+  const users = list.data()["members"].filter((m) => {
+    return !metadata.crawled_users.includes(m.id);
+  });
+
+  // Loop through the users in a batch (to prevent losing data due to rate limit errors).
+  for (let i = 0; i < users.length; i += batchSize) {
+    const batch = users.slice(i, i + batchSize);
+
+    const promises = batch.map((user) => {
+      return new Promise(async (resolve) => {
+        // The start time for the user.
+        const startTime = getStartTime(user.id, metadata, previousMetadata);
+
+        // Crawl the user.
+        await crawlUser(user.id, client, startTime.toDate());
+
+        // Mark the user as having been crawled asynchronously.
+        await metadataRef.update({
+          crawled_users: admin.firestore.FieldValue.arrayUnion(user.id),
+        });
+
+        resolve();
+      });
+    });
+
+    // Crawl the users in the batch.
+    await Promise.all(promises);
+
+    console.log("Updated batch");
+  }
+
+  // Mark the list as having been crawled.
+  metadataRef.update({
+    crawled_lists: admin.firestore.FieldValue.arrayUnion(list.id),
+  });
+}
+
+/**
+ * Get the time from which a user's tweets should be crawled.
+ *
+ * If the list has not been crawled before,
+ * it should be crawled from the genesis timestamp.
+ */
+function getStartTime(userId, metadata, previousMetadata) {
+  if (!previousMetadata || previousMetadata.crawled_users.includes(userId)) {
+    return metadata.start_time;
+  }
+
+  console.log(
+    `User ${userId} has not been crawled yet, starting from ${genesisTimestamp
+      .toDate()
+      .toISOString()}`
+  );
+
+  return genesisTimestamp;
+}
 
 /**
  * Get the crawl metadata, with information such as which users and lists have been crawled,
@@ -86,16 +141,11 @@ async function getMetadata() {
     .firestore()
     .collection("crawls")
     .orderBy("start_time", "desc")
-    .limit(1)
+    .limit(2)
     .get();
 
   // If no uncompleted crawl exists, create one.
   if (latest.empty || latest.docs[0].data()["completed_at"] != null) {
-    // Set the default start time to 2020.
-    let startTimestamp = admin.firestore.Timestamp.fromDate(
-      new Date(2020, 0, 1)
-    );
-
     // If a previous completed crawl exists, use the end time
     // of that crawl as starting time instead.
     if (!latest.empty) {
@@ -104,7 +154,7 @@ async function getMetadata() {
 
     // The metadata.
     const data = {
-      start_time: startTimestamp,
+      start_time: genesisTimestamp,
       completed_at: null,
       crawled_users: [],
       crawled_lists: [],
@@ -118,7 +168,11 @@ async function getMetadata() {
       .set(data);
 
     // Return the metadata.
-    return data;
+    return {
+      metadata: data,
+      previousMetadata:
+        latest.docs.length > 1 ? { ...latest.docs[1].data() } : null,
+    };
   } else {
     // Update the start time to match the ID of the document.
     if (
@@ -139,7 +193,11 @@ async function getMetadata() {
     }
 
     // Return the latest uncompleted crawl's metadata.
-    return { ...latest.docs[0].data() };
+    return {
+      metadata: { ...latest.docs[0].data() },
+      previousMetadata:
+        latest.docs.length > 1 ? { ...latest.docs[1].data() } : null,
+    };
   }
 }
 
@@ -212,7 +270,7 @@ async function getReplyTweetsRecursively(
   accumulatedTweets = [],
   paginationLimit = 10
 ) {
-  let params = {
+  const params = {
     max_results: 100,
     start_time: lastCrawledAt?.toISOString(),
     exclude: ["retweets"],
