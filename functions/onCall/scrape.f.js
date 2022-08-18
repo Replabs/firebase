@@ -1,6 +1,6 @@
-/**
- * Scrape all tweets since last scrape.
- */
+///
+/// For local testing, uncomment to use.
+///
 
 // const functions = require("firebase-functions");
 // const scrape = require("../scrape");

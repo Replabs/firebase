@@ -1,6 +1,6 @@
-// /**
-//  * Get a user's lists.
-//  */
+///
+/// For local testing, uncomment to use.
+///
 
 // const TwitterApi = require("twitter-api-v2").TwitterApi;
 // const functions = require("firebase-functions");
