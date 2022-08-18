@@ -15,7 +15,7 @@ module.exports = async () => {
     .firestore()
     .collection("tweets")
     .where("sentiment", "==", null)
-    .limit(500)
+    .limit(1000)
     .get();
 
   console.log(
