@@ -1,6 +1,9 @@
 const admin = require("./admin");
 const axios = require("axios");
 
+// The batch size of the updates.
+const batchSize = 10;
+
 // The base url for the flask app.
 const baseUrl = process.env.FUNCTIONS_EMULATOR
   ? "http://127.0.0.1:5000"
@@ -12,31 +15,27 @@ module.exports = async () => {
     .firestore()
     .collection("tweets")
     .where("sentiment", "==", null)
+    .limit(500)
     .get();
 
   console.log(
     `About to calculate embeddings and sentiments for ${tweets.docs.length} tweets.`
   );
 
-  let counter = 0;
+  for (let i = 0; i < tweets.docs.length; i += batchSize) {
+    // The tweets for the batch.
+    const batch = tweets.docs.slice(i, i + batchSize).map((t) => t.data());
 
-  for (const tweet of tweets.docs) {
-    // Get the response from the backend server.
-    const response = await axios.post(baseUrl + "/embed", {
+    // The embedded tweets.
+    await axios.post(baseUrl + "/embed", {
       api_key: process.env.TWITTER_FLASK_API_KEY,
-      tweets: [tweet.data()],
+      tweets: batch,
     });
 
-    // Update the firestore entry.
-    admin
-      .firestore()
-      .collection("tweets")
-      .doc(tweet.id)
-      .update(response.data)
-      .then(() => {
-        console.log(
-          `Updated tweet ${tweet.id} (${++counter}/${tweets.docs.length})`
-        );
-      });
+    console.log(
+      `Calculated embeddings and sentiment scores for ${i + batchSize} / ${
+        tweets.docs.length
+      } tweets.`
+    );
   }
 };

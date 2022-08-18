@@ -146,6 +146,8 @@ async function getMetadata() {
 
   // If no uncompleted crawl exists, create one.
   if (latest.empty || latest.docs[0].data()["completed_at"] != null) {
+    let startTimestamp = genesisTimestamp;
+
     // If a previous completed crawl exists, use the end time
     // of that crawl as starting time instead.
     if (!latest.empty) {
@@ -154,7 +156,7 @@ async function getMetadata() {
 
     // The metadata.
     const data = {
-      start_time: genesisTimestamp,
+      start_time: startTimestamp,
       completed_at: null,
       crawled_users: [],
       crawled_lists: [],
