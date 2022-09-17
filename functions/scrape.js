@@ -209,7 +209,7 @@ async function getMetadata() {
 async function crawlUser(userId, client, lastCrawledAt) {
   console.log(`Crawling user ${userId}`);
   // Get the tweets for the user.
-  const tweets = await getReplyTweetsRecursively(userId, client, lastCrawledAt);
+  const tweets = await getQuoteTweetsRecursively(userId, client, lastCrawledAt);
 
   //
   // Add the tweets to firestore.
@@ -259,11 +259,11 @@ async function crawlUser(userId, client, lastCrawledAt) {
 }
 
 /**
- * Fetches user mentions recursively until the  @param paginationLimit is hit.
+ * Fetches quote tweets recursively until the  @param paginationLimit is hit.
  *
- * Returns a list of mentions.
+ * Returns a list of quote tweets.
  */
-async function getReplyTweetsRecursively(
+async function getQuoteTweetsRecursively(
   id,
   client,
   lastCrawledAt,
@@ -275,7 +275,7 @@ async function getReplyTweetsRecursively(
   const params = {
     max_results: 100,
     start_time: lastCrawledAt?.toISOString(),
-    exclude: ["retweets"],
+    exclude: ["retweets", "replies"], // Exclude types which are not "quoted"
     expansions: ["author_id", "referenced_tweets.id", "in_reply_to_user_id"],
     "tweet.fields": ["author_id", "referenced_tweets", "text"],
   };
@@ -292,32 +292,32 @@ async function getReplyTweetsRecursively(
     return accumulatedTweets;
   }
 
-  tweets = response.data.map((tweet) => {
-    // Attach the full referenced tweet object to each tweet, if applicable.
-    if (tweet.referenced_tweets?.length > 0) {
-      // The referenced tweet's ID.
-      const referencedTweetId = tweet.referenced_tweets[0].id;
 
-      // The data of the referenced tweet.
-      const referencedTweet = response.includes.tweets?.find(
-        (t) => t.id == referencedTweetId
-      );
+  // Only include quote retweets with a referenced tweet, and that aren't referencing the same author.
+  let tweets = response.data.filter(
+    (t) =>
+      t.referenced_tweets?.length > 0 &&
+      t.referenced_tweets[0].type === "quoted" && 
+      t.referenced_tweets[0].author_id != t.author_id
+  );
 
-      // Append the referenced tweet.
-      tweet.referenced_tweet = referencedTweet;
-    }
+
+  // 
+  // Include all of the data of the referenced tweet.
+  //
+  tweets = tweets.map((tweet) => {
+    // The referenced tweet's ID.
+    const referencedTweetId = tweet.referenced_tweets[0].id;
+
+    // The data of the referenced tweet.
+    const referencedTweet = response.includes.tweets?.find(
+      (t) => t.id == referencedTweetId
+    );
+
+    // Append the referenced tweet.
+    tweet.referenced_tweet = referencedTweet;
 
     return tweet;
-  });
-
-  // Filter out tweets where the referenced tweet's author is themself.
-  tweets = tweets.filter((t) => {
-    if (t.referenced_tweet) {
-      return t.referenced_tweet.author_id != t.author_id;
-    }
-
-    // Don't include tweets without a reference tweet!
-    return false;
   });
 
   // Add the tweets to the total accumulated tweets.
@@ -331,7 +331,7 @@ async function getReplyTweetsRecursively(
     //
     // Fetch tweets for next pagination if appliable.
     //
-    return getReplyTweetsRecursively(
+    return getQuoteTweetsRecursively(
       id,
       client,
       lastCrawledAt,
